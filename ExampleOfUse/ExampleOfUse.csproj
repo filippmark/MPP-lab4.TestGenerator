@@ -5,4 +5,8 @@
     <TargetFramework>netcoreapp3.0</TargetFramework>
   </PropertyGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\MPP.lab4\TestGeneratorImpl.csproj" />
+  </ItemGroup>
+
 </Project>

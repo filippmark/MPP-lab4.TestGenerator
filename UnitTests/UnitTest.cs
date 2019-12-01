@@ -1,4 +1,5 @@
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using TestGeneratorImpl;
 
 namespace UnitTests
 {
@@ -8,6 +9,8 @@ namespace UnitTests
         [TestMethod]
         public void TestMethod1()
         {
+            TestGenerator g = new TestGenerator();
+            Assert.IsFalse(false);
         }
     }
 }
