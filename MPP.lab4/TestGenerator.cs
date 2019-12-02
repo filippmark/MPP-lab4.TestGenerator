@@ -17,17 +17,15 @@ namespace TestGeneratorImpl
         private Writer writer;
         private Reader reader;
 
-        public TestGenerator()
+        public TestGenerator(string dirPath)
         {
-            string dirPath = Directory.GetCurrentDirectory() + @"\UnitTests" + DateTime.Now.Ticks.ToString();
-            Console.WriteLine(dirPath);
-            writer = new Writer(dirPath);
+            string dir = Directory.GetCurrentDirectory() + @"\Tests" + DateTime.Now.Ticks.ToString();
+            writer = new Writer(dir);
             reader = new Reader();
         }
 
-        public void GenerateTests(List<string> files)
+        public Task GenerateTests(List<string> files)
         {
-
             var readFile = new TransformBlock<string, string>(
                 new Func<string, Task<string>>(reader.ReadCodeFromFile));
             var generateTests = new TransformBlock<string, List<TestClassDetails>>(
@@ -37,17 +35,22 @@ namespace TestGeneratorImpl
 
             var linkOptions = new DataflowLinkOptions { PropagateCompletion = true };
 
-            readFile.LinkTo(generateTests);
-            generateTests.LinkTo(writeTestsToFile);
+            readFile.LinkTo(generateTests, linkOptions);
+            generateTests.LinkTo(writeTestsToFile, linkOptions);
 
             foreach(var file in files)
             {
                 readFile.Post(file);
             }
+
+            readFile.Complete();
+            return writeTestsToFile.Completion;
         }
 
         public List<TestClassDetails> GetDetailsFromSourceCode(string sourceCode)
         {
+            Console.WriteLine(sourceCode);
+
             List<TestClassDetails> classesDetails = null;
 
             SyntaxTree tree = CSharpSyntaxTree.ParseText(sourceCode);
@@ -55,10 +58,11 @@ namespace TestGeneratorImpl
 
             NamespaceDeclarationSyntax ns = root.DescendantNodes().OfType<NamespaceDeclarationSyntax>().FirstOrDefault();
 
-            Console.WriteLine(ns.Name);
-
-            classesDetails = GetClassesInfoFromSoureCode(ns);
-
+            if (ns != null)
+            {
+                classesDetails = GetClassesInfoFromSoureCode(ns);
+                Console.WriteLine(classesDetails.Count);
+            }
 
             return classesDetails;
         }
@@ -68,7 +72,7 @@ namespace TestGeneratorImpl
             List<TestClassDetails> classesDetails = new List<TestClassDetails>();
             if (ns != null)
             {
-                var classes = ns.Members.OfType<ClassDeclarationSyntax>().Where(decl => decl.Modifiers.Any(mod => mod.IsKind(SyntaxKind.PublicKeyword)));
+                var classes = ns.Members.OfType<ClassDeclarationSyntax>().Where(decl => !decl.Modifiers.Any(mod => mod.IsKind(SyntaxKind.AbstractKeyword)) && decl.Modifiers.Any(mod => mod.IsKind(SyntaxKind.PublicKeyword)));
                 foreach(var classDecl in classes)
                 {
                     List<MemberDeclarationSyntax> methodDeclarations = new List<MemberDeclarationSyntax>();
@@ -76,7 +80,7 @@ namespace TestGeneratorImpl
                     CompilationUnitSyntax testDeclaration = null;
 
                     Console.WriteLine(classDecl.Identifier.ValueText);
-                    var methods =  classDecl.Members.OfType<MethodDeclarationSyntax>().Where(decl => decl.Modifiers.Any(mod => mod.IsKind(SyntaxKind.PublicKeyword)));
+                    var methods =  classDecl.Members.OfType<MethodDeclarationSyntax>().Where(decl => !decl.Modifiers.Any(mod => mod.IsKind(SyntaxKind.AbstractKeyword)) && decl.Modifiers.Any(mod => mod.IsKind(SyntaxKind.PublicKeyword)));
                     foreach(var method in methods)
                     {
                         methodDeclarations.Add(DeclareMethodForTest(method.Identifier.ValueText));       

@@ -17,18 +17,22 @@ namespace TestGeneratorImpl
         }
 
         public async void WriteTestsToFiles(List<TestClassDetails> tests)
-        {
-            foreach (var test in tests)
+        {   
+            if (tests != null)
             {
-                byte[] encodedText = Encoding.Unicode.GetBytes(test.Code);
-                string pathToFile = directoryPath + test.TestClassName;
-                using (FileStream sourceStream = new FileStream(pathToFile,
-                    FileMode.Append, FileAccess.Write, FileShare.None,
-                    bufferSize: 4096, useAsync: true))
+                foreach (var test in tests)
                 {
-                    await sourceStream.WriteAsync(encodedText, 0, encodedText.Length);
-                };
+                    byte[] encodedText = Encoding.Unicode.GetBytes(test.Code);
+                    string pathToFile = directoryPath + @"\" +test.TestClassName;
+                    using (FileStream sourceStream = new FileStream(pathToFile,
+                        FileMode.Append, FileAccess.Write, FileShare.None,
+                        bufferSize: 4096, useAsync: true))
+                    {
+                        await sourceStream.WriteAsync(encodedText, 0, encodedText.Length);
+                    };
+                }
             }
+            
         }
     }
 }
