@@ -9,17 +9,12 @@ namespace ExampleOfUse
     {
         public static void Main(string[] args)
         {
-            TestUse();
+            List<string> files = new List<string>(Directory.GetFiles(@"C:\Users\lenovo\source\repos\MPP.lab4\ClassesForGeneratingTests"));
+            string dir = Directory.GetCurrentDirectory() + @"\Tests" + DateTime.Now.Ticks.ToString();
+            var gen = new TestGenerator(dir);
+            gen.GenerateTests(files, new DegreeOfParallelism(3, 3, 3)).Wait();
         }
 
-        static async void TestUse()
-        {
-            List<string> files = new List<string>(Directory.GetFiles(@"C:\Users\lenovo\source\repos\MPP-lab2.Faker1\Generators"));
-            var gen = new TestGenerator("testsdirpath");
-            gen.GenerateTests(files).Wait();
-            Console.WriteLine("Finish...");
-            Console.ReadKey();
-        }
     }
 
 }

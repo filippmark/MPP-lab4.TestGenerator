@@ -22,7 +22,7 @@ namespace TestGeneratorImpl
             {
                 foreach (var test in tests)
                 {
-                    byte[] encodedText = Encoding.Unicode.GetBytes(test.Code);
+                    byte[] encodedText = Encoding.UTF8.GetBytes(test.Code);
                     string pathToFile = directoryPath + @"\" +test.TestClassName;
                     using (FileStream sourceStream = new FileStream(pathToFile,
                         FileMode.Append, FileAccess.Write, FileShare.None,

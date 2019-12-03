@@ -3,9 +3,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using System.Threading.Tasks.Dataflow;
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
@@ -19,26 +17,34 @@ namespace TestGeneratorImpl
 
         public TestGenerator(string dirPath)
         {
-            string dir = Directory.GetCurrentDirectory() + @"\Tests" + DateTime.Now.Ticks.ToString();
-            writer = new Writer(dir);
+            writer = new Writer(dirPath);
             reader = new Reader();
         }
 
-        public Task GenerateTests(List<string> files)
+        public Task GenerateTests(List<string> files, DegreeOfParallelism degree)
         {
             var readFile = new TransformBlock<string, string>(
-                new Func<string, Task<string>>(reader.ReadCodeFromFile));
+                new Func<string, Task<string>>(reader.ReadCodeFromFile), new ExecutionDataflowBlockOptions
+                {
+                    MaxDegreeOfParallelism = degree.AmountOfReadParallelProcess
+                });
             var generateTests = new TransformBlock<string, List<TestClassDetails>>(
-                new Func<string, List<TestClassDetails>>(GetDetailsFromSourceCode));
+                new Func<string, List<TestClassDetails>>(GetDetailsFromSourceCode), new ExecutionDataflowBlockOptions
+                {
+                    MaxDegreeOfParallelism = degree.AmountOfGenerateParallelProcess
+                });
             var writeTestsToFile = new ActionBlock<List<TestClassDetails>>(
-                 tests => writer.WriteTestsToFiles(tests));
+                 tests => writer.WriteTestsToFiles(tests), new ExecutionDataflowBlockOptions
+                 {
+                     MaxDegreeOfParallelism = degree.AmountOfWriteParallelProcess
+                 });
 
             var linkOptions = new DataflowLinkOptions { PropagateCompletion = true };
 
             readFile.LinkTo(generateTests, linkOptions);
             generateTests.LinkTo(writeTestsToFile, linkOptions);
 
-            foreach(var file in files)
+            foreach (var file in files)
             {
                 readFile.Post(file);
             }
@@ -49,7 +55,6 @@ namespace TestGeneratorImpl
 
         public List<TestClassDetails> GetDetailsFromSourceCode(string sourceCode)
         {
-            Console.WriteLine(sourceCode);
 
             List<TestClassDetails> classesDetails = null;
 
@@ -61,7 +66,6 @@ namespace TestGeneratorImpl
             if (ns != null)
             {
                 classesDetails = GetClassesInfoFromSoureCode(ns);
-                Console.WriteLine(classesDetails.Count);
             }
 
             return classesDetails;
@@ -73,23 +77,22 @@ namespace TestGeneratorImpl
             if (ns != null)
             {
                 var classes = ns.Members.OfType<ClassDeclarationSyntax>().Where(decl => !decl.Modifiers.Any(mod => mod.IsKind(SyntaxKind.AbstractKeyword)) && decl.Modifiers.Any(mod => mod.IsKind(SyntaxKind.PublicKeyword)));
-                foreach(var classDecl in classes)
+                foreach (var classDecl in classes)
                 {
                     List<MemberDeclarationSyntax> methodDeclarations = new List<MemberDeclarationSyntax>();
                     MemberDeclarationSyntax classDeclaration = null;
                     CompilationUnitSyntax testDeclaration = null;
 
-                    Console.WriteLine(classDecl.Identifier.ValueText);
-                    var methods =  classDecl.Members.OfType<MethodDeclarationSyntax>().Where(decl => !decl.Modifiers.Any(mod => mod.IsKind(SyntaxKind.AbstractKeyword)) && decl.Modifiers.Any(mod => mod.IsKind(SyntaxKind.PublicKeyword)));
-                    foreach(var method in methods)
+                    var methods = classDecl.Members.OfType<MethodDeclarationSyntax>().Where(decl => !decl.Modifiers.Any(mod => mod.IsKind(SyntaxKind.AbstractKeyword)) && decl.Modifiers.Any(mod => mod.IsKind(SyntaxKind.PublicKeyword)));
+                    foreach (var method in methods)
                     {
-                        methodDeclarations.Add(DeclareMethodForTest(method.Identifier.ValueText));       
+                        methodDeclarations.Add(DeclareMethodForTest(method.Identifier.ValueText));
                     }
 
                     string testClassName = classDecl.Identifier.ValueText + "UnitTest";
 
                     classDeclaration = DeclareClassForTest(testClassName, methodDeclarations);
-                    testDeclaration = DeclareTest(ns.Name.ToString(), CreateDirectivesForTest(ns.Name.ToString()), classDeclaration);
+                    testDeclaration = DeclareTest(CreateDirectivesForTest(ns.Name.ToString()), DeclareNameSpaceForTest(ns.Name.ToString(), classDeclaration));
                     Console.WriteLine(testDeclaration.NormalizeWhitespace().ToString());
 
 
@@ -108,10 +111,14 @@ namespace TestGeneratorImpl
             return usings;
         }
 
-        private CompilationUnitSyntax DeclareTest(string nameSpace, List<UsingDirectiveSyntax> usings, MemberDeclarationSyntax member)
+        private CompilationUnitSyntax DeclareTest(List<UsingDirectiveSyntax> usings, MemberDeclarationSyntax member)
         {
-            return CompilationUnit().WithUsings(List(usings)).WithMembers(SingletonList<MemberDeclarationSyntax>(NamespaceDeclaration(QualifiedName(IdentifierName(nameSpace), IdentifierName("Test")))))
-               .WithMembers(SingletonList(member));
+            return CompilationUnit().WithUsings(List(usings)).WithMembers(SingletonList(member));
+        }
+
+        private MemberDeclarationSyntax DeclareNameSpaceForTest(string nameSpace, MemberDeclarationSyntax member)
+        {
+            return NamespaceDeclaration(QualifiedName(IdentifierName(nameSpace), IdentifierName("Test"))).WithMembers(SingletonList(member));
         }
 
         private MemberDeclarationSyntax DeclareClassForTest(string className, List<MemberDeclarationSyntax> methods)
