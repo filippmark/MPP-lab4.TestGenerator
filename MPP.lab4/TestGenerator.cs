@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using System.Threading.Tasks.Dataflow;
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
+
 namespace TestGeneratorImpl
 {
     public class TestGenerator
@@ -56,24 +57,26 @@ namespace TestGeneratorImpl
         public List<TestClassDetails> GetDetailsFromSourceCode(string sourceCode)
         {
 
-            List<TestClassDetails> classesDetails = null;
+            List<TestClassDetails> classesDetails = new List<TestClassDetails>();
 
             SyntaxTree tree = CSharpSyntaxTree.ParseText(sourceCode);
             CompilationUnitSyntax root = tree.GetCompilationUnitRoot();
 
-            NamespaceDeclarationSyntax ns = root.DescendantNodes().OfType<NamespaceDeclarationSyntax>().FirstOrDefault();
+            var nameSpaces = root.DescendantNodes().OfType<NamespaceDeclarationSyntax>();
 
-            if (ns != null)
+            if (nameSpaces.Count() != 0)
             {
-                classesDetails = GetClassesInfoFromSoureCode(ns);
+                foreach (var ns in nameSpaces)
+                {
+                    GetClassesInfoFromSoureCode(ns, classesDetails);
+                }
             }
 
             return classesDetails;
         }
 
-        private List<TestClassDetails> GetClassesInfoFromSoureCode(NamespaceDeclarationSyntax ns)
+        private void GetClassesInfoFromSoureCode(NamespaceDeclarationSyntax ns, List<TestClassDetails> classesDetails)
         {
-            List<TestClassDetails> classesDetails = new List<TestClassDetails>();
             if (ns != null)
             {
                 var classes = ns.Members.OfType<ClassDeclarationSyntax>().Where(decl => !decl.Modifiers.Any(mod => mod.IsKind(SyntaxKind.AbstractKeyword)) && decl.Modifiers.Any(mod => mod.IsKind(SyntaxKind.PublicKeyword)));
@@ -84,9 +87,12 @@ namespace TestGeneratorImpl
                     CompilationUnitSyntax testDeclaration = null;
 
                     var methods = classDecl.Members.OfType<MethodDeclarationSyntax>().Where(decl => !decl.Modifiers.Any(mod => mod.IsKind(SyntaxKind.AbstractKeyword)) && decl.Modifiers.Any(mod => mod.IsKind(SyntaxKind.PublicKeyword)));
+                    Console.WriteLine(classDecl.Identifier.ValueText + "  " + methods.Count());
+                    int index = 1;
                     foreach (var method in methods)
                     {
-                        methodDeclarations.Add(DeclareMethodForTest(method.Identifier.ValueText));
+                        methodDeclarations.Add(DeclareMethodForTest(method.Identifier.ValueText + index));
+                        index++;
                     }
 
                     string testClassName = classDecl.Identifier.ValueText + "UnitTest";
@@ -99,7 +105,6 @@ namespace TestGeneratorImpl
                     classesDetails.Add(new TestClassDetails(testClassName + ".cs", testDeclaration.NormalizeWhitespace().ToString()));
                 }
             }
-            return classesDetails;
         }
 
 

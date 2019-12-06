@@ -1,6 +1,35 @@
 ﻿using System;
 using System.Reflection;
 
+
+namespace Generators
+{
+    public class ByteGenerator : Generator
+    {
+        public ByteGenerator(Random random) : base(random)
+        {
+            GeneratedType = typeof(byte);
+        }
+
+        public override object GenerateValue(Func<Type, object> generate)
+        {
+            return (byte)Random.Next();
+        }
+
+	public void GenerateValue1(int x)
+        {
+            return (byte)Random.Next();
+        }
+
+	public void GenerateValue1(float x)
+        {
+            return (byte)Random.Next();
+        }
+    }
+}
+
+
+
 namespace Generators
 {
     public  class BooleanGenerator : Generator
